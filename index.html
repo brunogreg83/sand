@@ -1351,10 +1351,27 @@ async function upd(col, id, data) {
 
 // ── Utils ──────────────────────────────────────────────────────────────────
 const getSessao = () => { try { return JSON.parse(sessionStorage.getItem('abc_auth')); } catch(e){ return null; } };
-const R$     = v => 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2});
+const R$     = v => { const n = Number(v); return 'R$ ' + (isNaN(n) ? '0,00' : n.toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})); };
 const fmtDt  = s => { if(!s) return '—'; const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
 const today  = () => new Date().toISOString().split('T')[0];
 const daysTo = s => Math.round((new Date(s) - new Date(today())) / 86400000);
+
+// Converte um valor digitado em formato brasileiro (ex: "1.234,56" ou "1234,56"
+// ou "1234.56" ou "1234") para Number. Retorna 0 se inválido/vazio.
+function parseValorBR(v) {
+  if (v == null) return 0;
+  let s = String(v).trim();
+  if (!s) return 0;
+  // remove tudo que não seja dígito, ponto, vírgula ou sinal
+  s = s.replace(/[^\d.,-]/g, '');
+  if (s.includes(',')) {
+    // vírgula = separador decimal → remove pontos (milhar) e troca vírgula por ponto
+    s = s.replace(/\./g, '').replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
 const totPed = p => Math.max(0, (p.itens||[]).reduce((s,i) => s + (parseFloat(i.qty)||0) * (parseFloat(i.preco)||0), 0) - (parseFloat(p.desconto)||0));
 const sit    = (e,m) => e <= 0 || e < m * 0.5 ? 'Crítico' : e < m ? 'Baixo' : 'OK';
 const stFin  = s => { const d=daysTo(s); return d<0?'Vencido':d<=3?'Pendente':'No prazo'; };
@@ -1400,7 +1417,7 @@ function somarDias(dataBase, dias) {
 // Usa cliente, valor total e condição de pagamento (pgto) do pedido.
 async function lancarContasReceberPedido(pedido, itens) {
   const total = totPed({ ...pedido, itens });
-  if (!pedido.cliente || !total) return;
+  if (!pedido.cliente || !total || isNaN(total)) return;
 
   const parcelas = gerarParcelasCondPgto(pedido.pgto);
   const cod = (pedido.id || '').toString().slice(-6).toUpperCase();
@@ -1416,6 +1433,7 @@ async function lancarContasReceberPedido(pedido, itens) {
         .reduce((s, p) => s + Math.round(total * p.pct * 100) / 100, 0);
       valor = Math.round((total - somaAnteriores) * 100) / 100;
     }
+    if (isNaN(valor)) valor = 0;
     const sufixo = totalParcelas > 1 ? ` (${i+1}/${totalParcelas})` : '';
     const partes = ['Pedido #' + cod];
     if (pedido.forma) partes.push(pedido.forma);
@@ -2123,7 +2141,7 @@ window.copiarCliente = () => {
 window.salvarReceber = async () => {
   await add('receber', {
     cliente: document.getElementById('rec-cli').value,
-    valor:   +document.getElementById('rec-val').value,
+    valor:   parseValorBR(document.getElementById('rec-val').value),
     vencimento: document.getElementById('rec-venc').value,
     desc:    document.getElementById('rec-desc').value,
   });
@@ -2147,7 +2165,7 @@ window.editReceber = id => {
 window.atualizarReceber = async id => {
   await upd('receber', id, {
     cliente:    document.getElementById('rec-cli').value,
-    valor:      +document.getElementById('rec-val').value,
+    valor:      parseValorBR(document.getElementById('rec-val').value),
     vencimento: document.getElementById('rec-venc').value,
     desc:       document.getElementById('rec-desc').value,
   });
@@ -2211,7 +2229,7 @@ document.addEventListener('change', e => {
 
 window.salvarPagar = async () => {
   const fornecedor  = document.getElementById('pag-forn').value.trim();
-  const valor       = parseFloat(document.getElementById('pag-val').value) || 0;
+  const valor       = parseValorBR(document.getElementById('pag-val').value);
   const vencimento  = document.getElementById('pag-venc').value;
   const desc        = document.getElementById('pag-desc').value;
   const recorrente  = document.getElementById('pag-recorrente').checked;
@@ -2266,7 +2284,7 @@ window.editPagar = id => {
 window.atualizarPagar = async id => {
   await upd('pagar', id, {
     fornecedor: document.getElementById('pag-forn').value,
-    valor:      +document.getElementById('pag-val').value,
+    valor:      parseValorBR(document.getElementById('pag-val').value),
     vencimento: document.getElementById('pag-venc').value,
     desc:       document.getElementById('pag-desc').value,
   });
