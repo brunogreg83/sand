@@ -1103,6 +1103,11 @@ function fazerLogin() {
   if (usuario) {
     salvarSessao({ login: usuario.login, nome: usuario.nome, perfil: usuario.perfil });
     aplicarPerfil(usuario.perfil, usuario.nome);
+    // restaurar última tela visitada (apenas admin; vendedor já é redirecionado para vendas)
+    const ultimaTela = sessionStorage.getItem('abc_tela');
+    if (ultimaTela && usuario.perfil === 'admin') {
+      restaurarTela(ultimaTela);
+    }
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('erp-shell').style.display    = 'flex';
     erro.classList.remove('show');
@@ -1150,6 +1155,45 @@ function aplicarPerfil(perfil, nome) {
   }
 }
 
+// Restaura a última tela visitada (sidebar, screens, nav mobile inferior, drawer e FAB)
+function restaurarTela(tela) {
+  if (!tela) return;
+  const titles = {dashboard:'Dashboard',vendas:'Vendas e Pedidos',estoque:'Estoque e Produtos',
+    clientes:'Clientes e CRM',financeiro:'Financeiro e Faturamento',compras:'Compras e Fornecedores',
+    relatorios:'Relatórios',ajustes:'Ajustes do Sistema'};
+  const mobTitles = {dashboard:'Dashboard',vendas:'Vendas e Pedidos',estoque:'Estoque e Produtos',
+    clientes:'Clientes e CRM',financeiro:'Financeiro',compras:'Compras',relatorios:'Relatórios',ajustes:'Ajustes'};
+
+  // telas
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const sc = document.getElementById('screen-' + tela);
+  if (sc) sc.classList.add('active');
+
+  // sidebar desktop
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const nb = document.getElementById('nav-' + tela);
+  if (nb) nb.classList.add('active');
+
+  // drawer mobile
+  const mdr = document.getElementById('mob-nav-' + tela);
+  if (mdr) mdr.classList.add('active');
+
+  // nav bar inferior mobile
+  document.querySelectorAll('.mn-item').forEach(b => b.classList.remove('active'));
+  const mbn = document.getElementById('mbn-' + tela);
+  if (mbn) mbn.classList.add('active');
+
+  // títulos
+  const pt = document.getElementById('page-title');
+  if (pt) pt.textContent = titles[tela] || 'Dashboard';
+  const mt = document.getElementById('mob-title');
+  if (mt) mt.textContent = mobTitles[tela] || 'Dashboard';
+
+  // FAB: mostrar só em Vendas
+  const fab = document.getElementById('mob-fab');
+  if (fab) fab.style.display = tela === 'vendas' ? 'flex' : 'none';
+}
+
 // ao carregar: checar sessão
 const sessao = verificarSessao();
 if (sessao) {
@@ -1160,20 +1204,7 @@ if (sessao) {
   // restaurar última tela visitada
   const ultimaTela = sessionStorage.getItem('abc_tela');
   if (ultimaTela && sessao.perfil === 'admin') {
-    // ativar a tela salva sem chamar goTo (firebase ainda não carregou)
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    const sc = document.getElementById('screen-' + ultimaTela);
-    if (sc) sc.classList.add('active');
-    const nb = document.getElementById('nav-' + ultimaTela);
-    if (nb) nb.classList.add('active');
-    const titles = {dashboard:'Dashboard',vendas:'Vendas e Pedidos',estoque:'Estoque e Produtos',
-      clientes:'Clientes e CRM',financeiro:'Financeiro e Faturamento',compras:'Compras e Fornecedores',
-      relatorios:'Relatórios',ajustes:'Ajustes do Sistema'};
-    const pt = document.getElementById('page-title');
-    if (pt) pt.textContent = titles[ultimaTela] || 'Dashboard';
-    const mt = document.getElementById('mob-title');
-    if (mt) mt.textContent = titles[ultimaTela] || 'Dashboard';
+    restaurarTela(ultimaTela);
   }
 }
 
